@@ -6,7 +6,7 @@ date: "10/08/26"
 Set Working directory and load function 
 
 ```{r}
-setwd("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/")
+setwd("/Projects/Overlap/")
 source("Overlap_func.R")
 ```
 
