@@ -1,0 +1,1200 @@
+---
+title: "Evans et al. overlap analyses"
+author: "Hannah Lucas-Clarke" 
+date: "10/08/26"
+---
+Set Working directory and load function 
+
+```{r}
+setwd("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/")
+source("Overlap_func.R")
+```
+
+Loading Packages 
+
+```{r}
+#| label: Load packages
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+library("tidyverse")
+library("gprofiler2")
+library("ComplexHeatmap")
+library("org.Hs.eg.db")
+library("AnnotationDbi")
+library("knitr")
+library("kableExtra")
+library("gridExtra")
+library("colorRamp2")
+library("viridis")
+library("GeneOverlap")
+library("readxl")
+library("janitor")
+library("ComplexHeatmap")
+library("circlize")
+library("grid")
+library("clusterProfiler")
+library("svglite")
+```
+
+# Loading in Evans et al 2025 Bulk transcriptomics dataset
+
+Using DEGs that are Padj < 0.05, no LFC cut off. 
+Cortical Regions grouped 
+Sub cortical Regions grouped 
+Collapsed regions 
+
+Universe is all the detected genes after cleaning - # 19,708
+
+```{r}
+#| label: Load bulk data
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+universe_bulk <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  dplyr::select(SYMBOL) %>% unique() %>% nrow()
+
+Cingulate_up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="C_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+Frontal_Up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="F_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+Parietal_Up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="P_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique() 
+Temporal_Up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="T_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique() 
+
+cortical_up <- c(Cingulate_up$SYMBOL,Frontal_Up$SYMBOL,Parietal_Up$SYMBOL,Temporal_Up$SYMBOL) %>% unique()
+
+
+Cingulate_down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="C_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+Frontal_Down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="F_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+Parietal_Down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="P_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique() 
+Temporal_Down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="T_CTX") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+
+cortical_down <- c(Cingulate_down$SYMBOL,Frontal_Down$SYMBOL,Parietal_Down$SYMBOL,Temporal_Down$SYMBOL) %>% unique()
+
+
+Collapsed_up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="Collapse-All Brain") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+
+Collapsed_down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="Collapse-All Brain") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+
+caudate_up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="CAU") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+
+caudate_down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="CAU") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+SN_up <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>%
+  filter(sig_reg=="Significantly Upregulated") %>% 
+  filter(tissue=="SN") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+SN_down <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  filter(sig_reg=="Significantly Downregulated") %>% 
+  filter(tissue=="SN") %>% 
+  dplyr::select(SYMBOL) %>% 
+  unique()
+
+
+
+subcortical_up <- c(caudate_up$SYMBOL,SN_up$SYMBOL) %>% unique()
+subcortical_down <- c(caudate_down$SYMBOL,SN_down$SYMBOL) %>% unique()
+
+bulk_all <- list(Collapsed_up$SYMBOL,Collapsed_down$SYMBOL,cortical_up,cortical_down,subcortical_up,subcortical_down) 
+names(bulk_all) <- c("Collapsed_up","Collapsed_down","Cortical_up","Cortical_down","Subcortical_up","Subcortical_down") 
+
+bulk_up <- list(Collapsed_up$SYMBOL,cortical_up,subcortical_up) 
+names(bulk_up) <- c("Collapsed_up","Cortical_up","Subcortical_up") 
+
+rm(Cingulate_up,Cingulate_down,Frontal_Up,Frontal_Down,Parietal_Up,Parietal_Down,Temporal_Down,Temporal_Up,Collapsed_up,Collapsed_down,caudate_up,caudate_down,SN_up,SN_down,cortical_down,cortical_up,subcortical_down,subcortical_up)
+```
+
+
+# Loading in Evans et al 2025 single cell dataset 
+
+Single cell 
+P = Parietal 
+C = Cingulate 
+F = Frontal 
+Level 2 annotation 
+
+No LFC cut-off 
+
+```{r}
+#| label: Load single cell data 
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+sc_universe <- readRDS("./OurData/SingleCell/de_X_sum_all_DE.rds") %>%
+  janitor::clean_names() %>%
+  filter(annot_level=="2") %>%
+  dplyr::select(gene_sym) %>% 
+  unique() %>% nrow()
+
+sc_degs_immune_C <- readRDS("./OurData/SingleCell/de_X_sum_all_DE.rds") %>%
+  janitor::clean_names() %>%
+  dplyr::mutate(direction = case_when(
+    log_fc<0 ~ "Down-regulated",
+    log_fc>0 ~ "Up-regulated"
+  )) %>%
+  tidyr::separate(coef, into=c("tissue", "comparison")) %>%
+  dplyr::mutate(comparison = case_when(comparison=="PDControl" ~ "Ctrl vs. PD")) %>%
+  filter(annot_level=="2") %>%
+  filter(clean_assay=="immune") %>%
+  filter(tissue=="C") %>% 
+  filter(adj_p_val<0.05)
+
+sc_degs_immune_C_Up <- sc_degs_immune_C %>% filter(direction=="Up-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+sc_degs_immune_C_Down <- sc_degs_immune_C %>% filter(direction=="Down-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+rm(sc_degs_immune_C)
+
+sc_degs_immune_P <- readRDS("./OurData/SingleCell/de_X_sum_all_DE.rds") %>%
+  janitor::clean_names() %>%
+  dplyr::mutate(direction = case_when(
+    log_fc<0 ~ "Down-regulated",
+    log_fc>0 ~ "Up-regulated"
+  )) %>%
+  tidyr::separate(coef, into=c("tissue", "comparison")) %>%
+  dplyr::mutate(comparison = case_when(comparison=="PDControl" ~ "Ctrl vs. PD")) %>%
+  filter(annot_level=="2") %>%
+  filter(clean_assay=="immune") %>%
+  filter(tissue=="P") %>% 
+  filter(adj_p_val<0.05)
+
+sc_degs_immune_P_Up <- sc_degs_immune_P %>% filter(direction=="Up-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+sc_degs_immune_P_Down <- sc_degs_immune_P %>% filter(direction=="Down-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+rm(sc_degs_immune_P)
+
+sc_degs_immune_F <- readRDS("./OurData/SingleCell/de_X_sum_all_DE.rds") %>%
+  janitor::clean_names() %>%
+  dplyr::mutate(direction = case_when(
+    log_fc<0 ~ "Down-regulated",
+    log_fc>0 ~ "Up-regulated"
+  )) %>%
+  tidyr::separate(coef, into=c("tissue", "comparison")) %>%
+  dplyr::mutate(comparison = case_when(comparison=="PDControl" ~ "Ctrl vs. PD")) %>%
+  filter(annot_level=="2") %>%
+  filter(clean_assay=="immune") %>%
+  filter(tissue=="F") %>% 
+  filter(adj_p_val<0.05)
+
+sc_degs_immune_F_Up <- sc_degs_immune_F %>% filter(direction=="Up-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+sc_degs_immune_F_Down <- sc_degs_immune_F %>% filter(direction=="Down-regulated") %>% dplyr::select(gene_sym)  %>% unique()
+rm(sc_degs_immune_F)
+
+Immune_Up <- c(sc_degs_immune_C_Up$gene_sym,sc_degs_immune_F_Up$gene_sym,sc_degs_immune_P_Up$gene_sym) %>% unique()
+Immune_Down <- c(sc_degs_immune_C_Down$gene_sym,sc_degs_immune_F_Down$gene_sym,sc_degs_immune_P_Down$gene_sym) %>% unique()
+
+level2 <- list(Immune_Up,Immune_Down)
+names(level2) <- list("Immune_Up","Immune_Down")
+
+rm(sc_degs_immune_C_Up)
+rm(sc_degs_immune_C_Down)
+rm(sc_degs_immune_P_Up)
+rm(sc_degs_immune_P_Down)
+rm(sc_degs_immune_F_Up)
+rm(sc_degs_immune_F_Down)
+
+```
+
+
+# Loading in external datasets of Disease Associated Microglia 
+
+**Disease Associated Microglia: DAM (Keren-Shaul 2017)**
+Had to convert to human symbols - did this with biomart gui 
+
+```{r}
+#| label: DAM
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+DAM_Up <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/DAM_UP_Hs.csv",show_col_types = FALSE) %>% 
+  dplyr::select(`Human gene name`) %>% unique() %>% na.omit()
+DAM_Down <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/DAM_down_Hs.csv",show_col_types = FALSE) %>% 
+  dplyr::select(`Human gene name`) %>% unique() %>% na.omit()
+```
+
+**Human Alzheimer's Microglia: HAM (Srinivasan 2020)**
+
+```{r}
+#| label: HAM
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+HAM_Up <- read.csv("./MicrogliaPhenotypeLists/inputData/HAM_list.csv") %>% filter(Human.AD.Myeloid=="Up") %>% dplyr::select(Gene.Symbol) %>% unique()
+HAM_Down <- read.csv("./MicrogliaPhenotypeLists/inputData/HAM_list.csv") %>% filter(Human.AD.Myeloid=="Down") %>% dplyr::select(Gene.Symbol) %>% unique()
+```
+
+
+**HuMiCA (Martins-Ferreira 2025) **
+Combines data from 19 experiments across different diseases 
+pseudo bulked 
+disease-inflammatory macrophages - DIM (cluster 2) - AD and LBD 
+disease associate microglia - DAM (clusters 1, 3, 5, 6) - AD and LBD 
+
+Only has upregulated genes (No LFC cut off)
+
+```{r}
+#| label: Humica
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+Humica_DAM_AD_Up <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/Humica_DAM.csv", show_col_types = FALSE) %>% 
+  filter(Group=="AD") %>% filter(log2FoldChange>0) %>% dplyr::select(Gene) %>% unique()
+Humica_DAM_LBD_Up <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/Humica_DAM.csv",show_col_types = FALSE) %>% 
+  filter(Group=="LBD") %>% filter(log2FoldChange>0) %>% dplyr::select(Gene) %>% unique()
+Humica_DIM_AD_Up <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/Humica_DIM.csv",show_col_types = FALSE) %>% 
+  filter(Group=="AD") %>% filter(log2FoldChange>0) %>% dplyr::select(Gene) %>% unique()
+Humica_DIM_LBD_Up <- read_csv("/Users/clarkeh/OneDrive - The Francis Crick Institute/Projects/ASAP_Paper_Overlap/MicrogliaPhenotypeLists/inputData/Humica_DIM.csv",show_col_types = FALSE) %>% 
+  filter(Group=="LBD") %>% filter(log2FoldChange>0) %>% dplyr::select(Gene) %>% unique()
+```
+
+Now combining these external DAM datasets into a list so i can do the overlaps - need symbols 
+
+```{r}
+#| label: combine datasets
+#| error: false
+#| warning: false
+#| echo: false
+#| output: false 
+all_external <- list(DAM_Up$`Human gene name`,
+                     DAM_Down$`Human gene name`,
+                     HAM_Up$Gene.Symbol,
+                     HAM_Down$Gene.Symbol,
+                     Humica_DAM_AD_Up$Gene,
+                     Humica_DAM_LBD_Up$Gene,
+                     Humica_DIM_AD_Up$Gene,
+                     Humica_DIM_LBD_Up$Gene)
+names(all_external) <- c("DAM_Up",
+                         "DAM_Down", 
+                         "HAM_Up",
+                         "HAM_Down",
+                         "Humica_DAM_AD_Up",
+                         "Humica_DAM_LBD_Up",
+                         "Humica_DIM_AD_Up",
+                         "Humica_DIM_LBD_Up")
+
+```
+
+
+# First overlap analysis our bulk data vs. extrnal DAM datasets 
+
+This is doing all bulk overlapping with all external
+adjusting within external datasets 
+Includes both up and down 
+universe is the bulk dataset all detected genes 
+calculates Szymkiewicz–Simpson overlap intersection/min of A and B 
+ 
+
+```{r}
+#| label: Overlap bulk. up and down
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+result1 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=all_external,
+                            universe=universe_bulk,
+                            nadj=3,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result1.csv")
+```
+
+Just visualizing the Up regulated signatures - same stats underneath 
+
+```{r}
+#| label: Overlap bulk ploting just Up 
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+result2 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=all_external,
+                            universe=universe_bulk,
+                            nadj=3,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("DAM_Down", "HAM_Down"),
+                            trunc_row = c("Collapsed_down", "Cortical_down", "Subcortical_down"),
+                            plotmax = 0.5,
+                            list1_title = "Bulk RNASeq PD vs. Control - Upregulated",
+                            split = c(rep("Keren-Shaul 2017", 1),rep("Srinivasan 2020", 1),rep("Martins-Ferreira 2025", 4)),
+                            tidy_col = c("DAM", "HAM", "HuMicA AD DAM", "HuMicA LBD DAM", "HuMicA AD DIM", "HuMicA LBD DIM"),
+                            tidy_row = c("Collapsed Brain", "Cortical", "Subcortical"),
+                            save_res = "./results/result2.csv",
+                            save_fig = "./results/result2.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+
+
+#Next overlapping single cell data to the external datasets
+
+Level 2 single cell and all external datasets 
+Adjusting within the external datasets 
+Includes both up and down 
+universe is the sc dataset all detected genes 
+calculates Szymkiewicz–Simpson overlap intersection/min of A and B 
+
+```{r}
+#| label: Overlap - heatmap level2
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+result3 <- Overlap_HLC_func(list1 = level2,
+                            list2=all_external,
+                            universe=sc_universe,
+                            nadj=3,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result3.csv")
+```
+
+Plotting up only same underlying stats just visualized differently 
+
+```{r}
+result4 <- Overlap_HLC_func(list1 = level2,
+                            list2=all_external,
+                            universe=sc_universe,
+                            nadj=3,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("DAM_Down", "HAM_Down"),
+                            trunc_row = c("Immune_Down"),
+                            plotmax = 0.5,
+                            list1_title = "Single Cell RNAseq PD vs. Control",
+                            split = c(rep("Keren-Shaul 2017", 1),rep("Srinivasan 2020", 1),rep("Martins-Ferreira 2025", 4)),
+                            tidy_col = c("DAM", "HAM", "HuMicA AD DAM", "HuMicA LBD DAM", "HuMicA AD DIM", "HuMicA LBD DIM"),
+                            name_trunc = "Immune",
+                            save_res = "./results/result4.csv",
+                            save_fig = "./results/result4.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+
+
+#Next moving to the invitro datasets 
+
+1. Loading Cell Data (3 datasets) iMGLS + 
+  Monomers 
+  Mutation 
+  Oligomers 
+
+```{r}
+monomer_wt_up <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="up") %>% filter(comparison=="wt vs ut") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_wt_up <- monomer_wt_up[monomer_wt_up != ""]
+
+monomer_wt_down <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="down") %>% filter(comparison=="wt vs ut") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_wt_down <- monomer_wt_down[monomer_wt_down != ""]
+
+monomer_a53t_UT_up <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="up") %>% filter(comparison=="a53t vs ut") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_a53t_UT_up <- monomer_a53t_UT_up[monomer_a53t_UT_up != ""]
+
+monomer_a53t_UT_down <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="down") %>% filter(comparison=="a53t vs ut") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_a53t_UT_down <- monomer_a53t_UT_down[monomer_a53t_UT_down != ""]
+
+monomer_a53t_WT_up <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="up") %>% filter(comparison=="a53t vs wt") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_a53t_WT_up <- monomer_a53t_WT_up[monomer_a53t_WT_up != ""]
+
+monomer_a53t_WT_down <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% 
+  filter(reg=="down") %>% filter(comparison=="a53t vs wt") %>% unique() %>% dplyr::select(external_gene_name)
+monomer_a53t_WT_down <- monomer_a53t_WT_down[monomer_a53t_WT_down != ""]
+
+oligomer_up <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% 
+  filter(reg=="up") %>% unique() %>% dplyr::select(external_gene_name)
+oligomer_up <- oligomer_up[oligomer_up != ""]
+
+oligomer_down <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% 
+  filter(reg=="down") %>%  unique() %>% dplyr::select(external_gene_name)
+oligomer_down <- oligomer_down[oligomer_down != ""]
+
+mutation_up <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% 
+  filter(reg=="up") %>% filter(comparison=="a53t vs ctrl (ut)") %>%  unique() %>% dplyr::select(external_gene_name)
+mutation_up <- mutation_up[mutation_up != ""]
+
+mutation_down <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% 
+  filter(reg=="down") %>% filter(comparison=="a53t vs ctrl (ut)") %>%  unique() %>% dplyr::select(external_gene_name)
+mutation_down <- mutation_down[mutation_down != ""]
+
+
+# These are actually 3 different experiments - getting split up now into monomer WT, monomer A53T, oligomer, Patient - diff protein species 
+
+invitro_mono <- list(monomer_wt_up,monomer_wt_down,monomer_a53t_UT_up,monomer_a53t_UT_down,monomer_a53t_WT_up,monomer_a53t_WT_down)
+names(invitro_mono) <- c("monomer_wt_up","monomer_wt_down","monomer_a53t_UT_up","monomer_a53t_UT_down","monomer_a53t_WT_up","monomer_a53t_WT_down") 
+
+invitro_oligomer <- list(oligomer_up,oligomer_down)
+names(invitro_oligomer) <- c("oligomer_up","oligomer_down") 
+
+invitro_mutation <- list(mutation_up,mutation_down)
+names(invitro_mutation) <- c("mutation_up","mutation_down") 
+
+```
+
+2. Invitro universes - 3 of these 
+
+```{r}
+universe_invitro_monomer <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% select(external_gene_name) %>% unique() %>% nrow()
+universe_invitro_mutation <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% select(external_gene_name) %>% unique() %>% nrow()
+universe_invitro_oligomer <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% select(external_gene_name) %>% unique() %>% nrow()
+```
+
+*NOW overlapping our in vitro datasets to the DAM profiles*
+
+1. Monomer dataset vs. external DAM 
+
+Adjusting within the external datasets 
+Includes both up and down 
+universe monomer specific 
+calculates Szymkiewicz–Simpson overlap intersection/min of A and B 
+
+```{r}
+#| label: Overlap - heatmap invitro monomer 
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+
+result5 <- Overlap_HLC_func(list1 = invitro_mono,
+                            list2=all_external,
+                            universe=universe_invitro_monomer,
+                            nadj=3,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result5.csv")
+
+```
+
+Plotting Monomer dataset but just showing upregulated overlaps 
+
+```{r}
+
+result6 <- Overlap_HLC_func(list1 = invitro_mono,
+                            list2=all_external,
+                            universe=universe_invitro_monomer,
+                            nadj=3,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("DAM_Down", "HAM_Down"),
+                            trunc_row = c("monomer_wt_down", "monomer_a53t_UT_down","monomer_a53t_WT_down"),
+                            plotmax = 0.5,
+                            list1_title = "In vitro microglia \n + monomeric protein",
+                            split = c(rep("Keren-Shaul 2017", 1),rep("Srinivasan 2020", 1),rep("Martins-Ferreira 2025", 4)), 
+                            tidy_col = c("DAM", "HAM", "HuMicA AD DAM", "HuMicA LBD DAM", "HuMicA AD DIM", "HuMicA LBD DIM"),
+                            tidy_row = c("WT vs. UT", "A53T vs. UT", "A53T vs. WT"),
+                            save_res = "./results/result6.csv",
+                            save_fig = "./results/result6.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+
+2. Mutation dataset 
+
+```{r}
+#| label: Overlap - heatmap invitro mutation 
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+
+result7 <- Overlap_HLC_func(list1 = invitro_mutation,
+                            list2=all_external,
+                            universe=universe_invitro_mutation,
+                            nadj=3,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result7.csv")
+```
+
+Mutation dataset but just showing upregulated overlaps 
+
+```{r}
+result8 <- Overlap_HLC_func(list1 = invitro_mutation,
+                            list2=all_external,
+                            universe=universe_invitro_mutation,
+                            nadj=3,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("DAM_Down", "HAM_Down"),
+                            trunc_row = c("mutation_down"),
+                            plotmax = 0.5,
+                            list1_title = "In vitro microglia \n SNCA A53T vs. Control",
+                            split = c(rep("Keren-Shaul 2017", 1),rep("Srinivasan 2020", 1),rep("Martins-Ferreira 2025", 4)),
+                            name_trunc = "SNCA A53T vs. Control", 
+                            tidy_col = c("DAM", "HAM", "HuMicA AD DAM", "HuMicA LBD DAM", "HuMicA AD DIM", "HuMicA LBD DIM"),
+                            save_res = "./results/results8.csv",
+                            save_fig = "./results/result8.svg",
+                            width_fig = 7,
+                            height_fig = 3)
+
+```
+
+3.Oligomer dataset 
+
+```{r}
+#| label: Overlap - heatmap invitro oligomer 
+#| error: false
+#| warning: false
+#| echo: false
+#| output: true
+
+result9 <- Overlap_HLC_func(list1 = invitro_oligomer,
+                            list2=all_external,
+                            universe=universe_invitro_oligomer,
+                            nadj=3,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result9.csv")
+
+```
+
+Oligomer dataset but just showing upregulated overlaps 
+
+```{r}
+result10 <- Overlap_HLC_func(list1 = invitro_oligomer,
+                            list2=all_external,
+                            universe=universe_invitro_oligomer,
+                            nadj=3,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("DAM_Down", "HAM_Down"),
+                            trunc_row = c("oligomer_down"),
+                            plotmax = 0.5,
+                            list1_title = "In vitro microglia \n + Oligomeric Protein",
+                            split = c(rep("Keren-Shaul 2017", 1),rep("Srinivasan 2020", 1),rep("Martins-Ferreira 2025", 4)),
+                            name_trunc = "WT vs. UT",
+                            tidy_col = c("DAM", "HAM", "HuMicA AD DAM", "HuMicA LBD DAM", "HuMicA AD DIM", "HuMicA LBD DIM"),
+                            save_res = "./results/result10.csv",
+                            save_fig = "./results/result10.svg",
+                            width_fig = 7,
+                            height_fig = 3)
+
+```
+
+
+
+*NOW overlapping our in vitro datasets to our in vivo bulk RNAseq brain*
+
+Do our in vitro datasets overlap with the brain? 
+Doing this separate for each of the asyn species
+The universes will be what is picked up in both the invitro and bulk data 
+
+Defining universes 
+
+```{r}
+universe_bulk <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  dplyr::select(SYMBOL) %>% unique() 
+
+universe_invitro_monomer <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% select(external_gene_name) %>% unique() 
+universe_invitro_mutation <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% select(external_gene_name) %>% unique() 
+universe_invitro_oligomer <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% select(external_gene_name) %>% unique() 
+
+universe_intersect_bulk_monomer <- intersect(universe_bulk$SYMBOL,universe_invitro_monomer$external_gene_name) %>% length()
+universe_intersect_bulk_mutation <- intersect(universe_bulk$SYMBOL, universe_invitro_mutation$external_gene_name) %>% length()
+universe_intersect_bulk_oligomer <- intersect(universe_bulk$SYMBOL, universe_invitro_oligomer$external_gene_name) %>% length()
+
+```
+
+
+1. Do monomer datasets overlap with the brain? 
+- stats for all but plotted just up
+```{r}
+result11_all <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_mono,
+                            universe=universe_intersect_bulk_monomer,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result11_all.csv")
+
+result11 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_mono,
+                            universe=universe_intersect_bulk_monomer,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("monomer_wt_down", "monomer_a53t_UT_down", "monomer_a53t_WT_down"),
+                            trunc_row = c("Collapsed_down", "Cortical_down", "Subcortical_down"),
+                            plotmax = 0.5,
+                            list1_title = "Bulk RNA seq - upregulated", 
+                            tidy_row =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            tidy_col = c("WT vs. UT", "A53T vs. UT", "A53T vs. WT"),
+                            save_res = "./results/result11.csv",
+                            save_fig = "./results/result11.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+```
+
+2. Do mutation datasets overlap with the brain?
+
+- stats has it all but only up shown
+
+```{r}
+result12_all <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_mutation,
+                            universe=universe_intersect_bulk_mutation,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result12_all.csv")
+
+result12 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_mutation,
+                            universe=universe_intersect_bulk_mutation,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("mutation_down"),
+                            trunc_row = c("Collapsed_down", "Cortical_down", "Subcortical_down"),
+                            list1_title = "In vitro microglia \n SNCA A53T vs. Control - Upregulated",
+                            plotmax = 0.5,
+                            name_trunc = "SNCA A53T vs. Control",
+                            tidy_col =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            save_res = "./results/result12.csv",
+                            save_fig = "./results/result12.svg",
+                            width_fig = 6,
+                            height_fig = 3)
+```
+
+3. Do oligomer datasets overlap with the brain?
+
+```{r}
+
+result13_all <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_oligomer,
+                            universe=universe_intersect_bulk_oligomer,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=FALSE,
+                            save_res = "./results/result13_all.csv")
+
+result13 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=invitro_oligomer,
+                            universe=universe_intersect_bulk_oligomer,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("oligomer_down"),
+                            trunc_row = c("Collapsed_down", "Cortical_down", "Subcortical_down"),
+                            plotmax = 0.5,
+                            name_trunc = "WT vs. UT",
+                            tidy_col =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            list1_title = "In vitro microglia \n  + Oligomeric protein - Upregulated",
+                            save_res = "./results/result13.csv",
+                            save_fig = "./results/result13.svg",
+                            width_fig = 6,
+                            height_fig = 3)
+```
+
+#Next up - what about asyn unique genes#
+
+Looking at upregulated genes from our invitro datasets : 
+A53T patient vs. control 
+A53T monomer vs. UT 
+A53T monomer vs. WT monomer 
+WT oligomer vs. UT
+
+Then looked at the union with Keren-Shaul DAM upregulated genes - those not in the union = unique to alpha syn
+
+```{r}
+unique_up_monomerA53T_vs_UT <- setdiff(monomer_a53t_UT_up,DAM_Up)
+unique_up_monomerA53T_vs_WT <- setdiff(monomer_a53t_WT_up,DAM_Up)
+unique_up_oligomer <- setdiff(oligomer_up,DAM_Up)
+unique_up_A53Tpatient <- setdiff(mutation_up,DAM_Up)
+
+save <- as.data.frame(unique_up_oligomer)
+write_csv(save,"./results/noDAM_yesOligomer_genes.csv")
+
+unique_monomer <- list(unique_up_monomerA53T_vs_UT,unique_up_monomerA53T_vs_WT)
+unique_patient <- list(unique_up_A53Tpatient)
+unique_oligomer <- list(unique_up_oligomer)
+
+names(unique_monomer) <- c("A53T monomer vs. UT", "A53T monomer vs. WT monomer" )
+names(unique_patient) <- c("SNCA A53T vs. Control")
+names(unique_oligomer) <- c("WT Oligomer vs. UT")
+
+unique_total_asyn <- c(unique_up_monomerA53T_vs_UT,unique_up_monomerA53T_vs_WT,unique_up_oligomer,unique_up_A53Tpatient) %>% unique()
+unique_total_asyn <- list(unique_total_asyn)
+names(unique_total_asyn) <- c("asyn signature")
+```
+
+Then did an overlap analysis with our bulk data 
+This answers whether what we see in the dish that is uniquely asyn in the brain
+
+Universe here - the specific invitro dataset overlapped with the bulk dataset and took the union 
+
+1. Defining universe 
+
+```{r}
+universe_bulk <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  dplyr::select(SYMBOL) %>% unique()
+universe_invitro_monomer <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% select(external_gene_name) %>% unique()
+universe_invitro_mutation <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% select(external_gene_name) %>% unique()
+universe_invitro_oligomer <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% select(external_gene_name) %>% unique()
+
+combined <- c(universe_invitro_monomer$external_gene_name,universe_invitro_mutation$external_gene_name,universe_invitro_oligomer$external_gene_name) %>% unique()
+combined_universe <- intersect(combined,universe_bulk$SYMBOL) %>% length()
+
+union_monomer <- intersect(universe_bulk$SYMBOL,universe_invitro_monomer$external_gene_name) %>% length()
+union_mutation <- intersect(universe_bulk$SYMBOL,universe_invitro_mutation$external_gene_name) %>% length()
+union_oligomer <- intersect(universe_bulk$SYMBOL,universe_invitro_oligomer$external_gene_name) %>% length()
+
+rm(universe_bulk, universe_invitro_monomer, universe_invitro_mutation, universe_invitro_oligomer)
+```
+
+2. Performing Overlap for monomer asyn specific to our bulk data 
+
+```{r}
+result14 <- Overlap_HLC_func(list1 = bulk_up,
+                            list2=unique_monomer,
+                            universe=union_monomer,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            tidy_row =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            tidy_col = c("A53T vs. UT", "A53T vs. WT"),
+                            save_res = "./results/result14.csv",
+                            save_fig = "./results/result14.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+
+```
+
+
+3. Performing Overlap for mutation asyn specific to our bulk data 
+
+```{r}
+result15 <- Overlap_HLC_func(list1 = bulk_up,
+                            list2=unique_patient,
+                            universe=union_mutation,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            tidy_row =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            save_res = "./results/result15.csv",
+                            save_fig = "./results/result15.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+
+```
+
+
+4. Performing Overlap for oligomer asyn specific to our bulk data 
+
+```{r}
+result16 <- Overlap_HLC_func(list1 = bulk_up,
+                            list2=unique_oligomer,
+                            universe=union_oligomer,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            tidy_row =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            save_res = "./results/result16.csv",
+                            save_fig = "./results/result16.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+
+```
+
+#Pathway analysis#
+
+Looking at those that are in the intersection of the significant oligomer overlap analysis 
+what are they enriched for? 
+
+```{r}
+overlap <- newGOM(bulk_up, unique_oligomer, genome.size=union_oligomer)
+
+inter_oligomer_collapsed <- overlap@go.nested.list$`WT Oligomer vs. UT`$Collapsed_up@intersection
+inter_oligomer_ctx <- overlap@go.nested.list$`WT Oligomer vs. UT`$Cortical_up@intersection
+inter_oligomer_subctx <- overlap@go.nested.list$`WT Oligomer vs. UT`$Subcortical_up@intersection
+
+write.csv(inter_oligomer_collapsed,"./results/intersection_uniqueoligomer_collapsed_uponly.csv")
+write.csv(inter_oligomer_ctx, "./results/intersection_uniqueoligomer_cortical_uponly.csv")
+write.csv(inter_oligomer_subctx, "./results/intersection_uniqueoligomer_subcortical_uponly.csv")
+
+GO_inter_oligomer_collapsed <- enrichGO(gene=inter_oligomer_collapsed,keyType = "SYMBOL", OrgDb = org.Hs.eg.db, ont="ALL")
+GO_inter_oligomer_ctx <- enrichGO(gene=inter_oligomer_ctx,keyType = "SYMBOL", OrgDb = org.Hs.eg.db, ont="ALL")
+GO_inter_oligomer_subctx <- enrichGO(gene=inter_oligomer_subctx,keyType = "SYMBOL", OrgDb = org.Hs.eg.db, ont="ALL")
+
+GO_inter_oligomer_collapsed@result <- subset(GO_inter_oligomer_collapsed@result,ONTOLOGY %in% c("BP", "MF"))
+GO_inter_oligomer_ctx@result <- subset(GO_inter_oligomer_ctx@result,ONTOLOGY %in% c("BP", "MF"))
+GO_inter_oligomer_subctx@result <- subset(GO_inter_oligomer_subctx@result,ONTOLOGY %in% c("BP", "MF"))
+
+write.csv(GO_inter_oligomer_collapsed@result,"./results/intersection_uniqueoligomer_collapsed_uponly_RESULTS.csv")
+write.csv(GO_inter_oligomer_ctx@result, "./results/intersection_uniqueoligomer_cortical_uponly_RESULTS.csv")
+write.csv(GO_inter_oligomer_subctx@result, "./results/intersection_uniqueoligomer_subcortical_uponly_RESULTS.csv")
+
+
+```
+
+
+```{r}
+GO_collapsed <- dotplot(GO_inter_oligomer_collapsed,showCategory = 10, split = "ONTOLOGY") + facet_grid(ONTOLOGY ~ ., scales = "free_y", space = "free_y")
+ggsave(
+  filename = "./results/GO_oligomer_collapsed.svg",
+  plot = GO_collapsed,
+  device = "svg",
+  width = 7,
+  height = 11
+)
+
+GO_Cortical <- dotplot(GO_inter_oligomer_ctx,showCategory = 10, split = "ONTOLOGY") + facet_grid(ONTOLOGY ~ ., scales = "free_y", space = "free_y")
+ggsave(
+  filename = "./results/GO_oligomer_cortical.svg",
+  plot = GO_Cortical,
+  device = "svg",
+  width = 7,
+  height = 11
+)
+
+GO_subcortical <- dotplot(GO_inter_oligomer_subctx,showCategory = 10, split = "ONTOLOGY") + facet_grid(ONTOLOGY ~ ., scales = "free_y", space = "free_y")
+ggsave(
+  filename = "./results/GO_oligomer_subcortical.svg",
+  plot = GO_subcortical,
+  device = "svg",
+  width = 7,
+  height = 11
+)
+```
+
+5. Regardless of source the asyn signature across all of the invitro datasets 
+
+```{r}
+result17 <- Overlap_HLC_func(list1 = bulk_up,
+                            list2=unique_total_asyn,
+                            universe=combined_universe,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            tidy_row =  c("Collapsed Brain", "Cortical", "Subcortical"),
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            save_res = "./results/result17.csv",
+                            save_fig = "./results/result17.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+
+```
+
+
+Ok now what about in vitro tau datasets? 
+
+Taking the data from the folllowing paper: 
+
+Kreger Karabova et al 2026 (Sally Cowley) - tau 
+monomeric (rTauM) - 5 down regulated genes only HSPG2, IFITM10,  COL1A1, COL5A1, APBA3
+fibrillar (rTauF) - 87 down and 96 up 
+tau from brains (hTau) - 29 up and 23 down 
+
+
+```{r}
+Kreger_universe_1 <-  read.csv("./Karabova_2026_ctrl_fibril.csv") %>%  select(X) %>% unique()
+Kreger_universe_2 <-  read.csv("./Karabova_2026_hdTau_hTau.csv") %>%  select(X) %>% unique()
+Kreger_universe_3 <-  read.csv("./Karabova_2026_monomer_ctrl.csv") %>%  select(X) %>% unique()
+Kreger_universe <- c(Kreger_universe_1$X, Kreger_universe_2$X, Kreger_universe_3$X) %>% unique()
+
+rTauF_vs_vehicle_down <- read.csv("./Karabova_2026_ctrl_fibril.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange < -0.5)
+rTauF_vs_vehicle_up <- read.csv("./Karabova_2026_ctrl_fibril.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange > 0.5)
+rTauM_vs_vehicle_down <- read.csv("./Karabova_2026_monomer_ctrl.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange < -0.5)
+#rTauM_vs_vehicle_up <- read.csv("./Karabova_2026_monomer_ctrl.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange > 0.5)
+hTau_up <- read.csv("./Karabova_2026_hdTau_hTau.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange > 0.5)
+hTau_down <- read.csv("./Karabova_2026_hdTau_hTau.csv") %>% filter(padj<0.05) %>% filter(log2FoldChange < -0.5)
+
+Tau <- list(rTauM_vs_vehicle_down$X, rTauF_vs_vehicle_down$X,rTauF_vs_vehicle_up$X,  hTau_down$X, hTau_up$X)
+names(Tau) <- c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down", "Tau Fibril vs. UT - Up","hTau - Down", "hTau - Up")
+```
+
+Defining universes 
+
+```{r}
+universe_invitro_monomer <- read.csv("./OurData/Invitro/protein_coding_monomer.csv") %>% select(external_gene_name) %>% unique()
+universe_invitro_mutation <- read.csv("./OurData/Invitro/protein_coding_mutation.csv") %>% select(external_gene_name) %>% unique()
+universe_invitro_oligomer <- read.csv("./OurData/Invitro/protein_coding_oligomer.csv") %>% select(external_gene_name) %>% unique()
+
+union_monomer_wtau <- intersect(Kreger_universe,universe_invitro_monomer$external_gene_name) %>% length()
+union_mutation_wtau <- intersect(Kreger_universe,universe_invitro_mutation$external_gene_name) %>% length()
+union_oligomerwtau <- intersect(Kreger_universe,universe_invitro_oligomer$external_gene_name) %>% length()
+
+universe_bulk_2 <- read.csv("./OurData/Bulk/dge_all_Gene_panel_studies_lookups_added.csv") %>% 
+  dplyr::select(SYMBOL) %>% unique()
+union_bulk_tau <- intersect(Kreger_universe,universe_bulk_2$SYMBOL) %>% length()
+
+rm(universe_invitro_monomer, universe_invitro_mutation, universe_invitro_oligomer,universe_bulk_2)
+```
+
+
+Monomer asyn with Tau 
+
+```{r}
+result18 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_mono,
+                            universe=union_monomer_wtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.6,
+                            list1_title = "Kreger - tau",
+                            tidy_col = c("WT vs. UT - Up", "WT vs. UT - Down", "A53T vs. UT - Up", "A53T vs. UT - Down", "A53T vs. WT - Up", "A53T vs. WT - Down"),
+                            save_res = "./results/result18.csv",
+                            save_fig = "./results/result18.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+Just upregulated from above - but same stats underneath 
+
+```{r}
+result19 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_mono,
+                            universe=union_monomer_wtau,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("monomer_wt_down", "monomer_a53t_UT_down", "monomer_a53t_WT_down"),
+                            trunc_row = c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down", "hTau - Down"),
+                            plotmax = 0.5,
+                            tidy_col = c("WT vs. UT", "A53T vs. UT", "A53T vs. WT"),
+                            tidy_row = c("Tau Fibril vs. UT", "hTau"), 
+                            list1_title = "Kreger Tau - Upregulated",
+                            save_res = "./results/result19.csv",
+                            save_fig = "./results/result19.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+
+
+```
+
+Mutation 
+
+```{r}
+result20 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_mutation,
+                            universe=union_mutation_wtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5, 
+                            tidy_col = c("SNCA A53T vs. Control - Up", "SNCA A53T vs. Control - Down"),
+                            list1_title = "Kreger - Tau",
+                            save_res = "./results/result20.csv",
+                            save_fig = "./results/result20.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+Just upregulated from above - but same stats underneath 
+
+```{r}
+result21 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_mutation,
+                            universe=union_mutation_wtau,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("mutation_down"),
+                            trunc_row = c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down", "hTau - Down"),
+                            plotmax = 0.5,
+                            name_trunc = "SNCA A53T vs. Control", 
+                            list1_title = "In vitro microglia", 
+                            tidy_col = c("Tau Fibril vs. UT", "hTau"),
+                            save_res = "./results/result21.csv",
+                            save_fig = "./results/result21.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+
+```
+
+
+Oligomer 
+
+```{r}
+result22 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_oligomer,
+                            universe=union_oligomerwtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5, 
+                            tidy_col = c("WT Oligomer vs. UT - Up", "WT Oligomer vs. UT - Down"), 
+                            list1_title = "Kreger - tau",
+                            save_res = "./results/result22.csv",
+                            save_fig = "./results/result22.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+```
+Just upregulated from above - but same stats underneath 
+
+```{r}
+result23 <- Overlap_HLC_func(list1 = Tau,
+                            list2=invitro_oligomer,
+                            universe=union_oligomerwtau,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            trunc_col = c("oligomer_down"),
+                            trunc_row = c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down", "hTau - Down"),
+                            plotmax = 0.5,
+                            name_trunc = "WT Oligomer vs. UT",
+                            tidy_col = c("Tau Fibril vs. UT", "hTau"),
+                            list1_title = "In vitro microglia",
+                            save_res = "./results/result23.csv",
+                            save_fig = "./results/result23.svg",
+                            width_fig = 6,
+                            height_fig = 3)
+
+
+```
+
+OK what about those unique asyn that were identified earlier - seperate from DAM and how they overlap with the tau signature? - just upregulated for both in here 
+
+```{r}
+Tau_UP <- list(rTauF_vs_vehicle_up$X, hTau_up$X)
+names(Tau_UP) <- c("Tau Fibril vs. UT", "hTau")
+
+result24 <- Overlap_HLC_func(list1 = Tau_UP,
+                            list2=unique_monomer,
+                            universe=union_monomer_wtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            tidy_col = c("A53T vs. UT", "A53T vs. WT"), 
+                            list1_title = "Kreger - Tau",
+                            save_res = "./results/result24.csv",
+                            save_fig = "./results/result24.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+                        
+```
+
+
+```{r}
+result25 <- Overlap_HLC_func(list1 = Tau_UP,
+                            list2=unique_patient,
+                            universe=union_mutation_wtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5, 
+                            list1_title = "Tau - Kreger",
+                            save_res = "./results/result25.csv",
+                            save_fig = "./results/result25.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+```
+
+
+Oligomer
+
+```{r}
+result26 <- Overlap_HLC_func(list1 = Tau_UP,
+                            list2=unique_oligomer,
+                            universe=union_oligomerwtau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            plotmax = 0.5, 
+                            list1_title = "Kreger - Tau",
+                            save_res = "./results/result26.csv",
+                            save_fig = "./results/result26.svg",
+                            width_fig = 6,
+                            height_fig = 4)
+
+```
+
+
+All tau vs. all bulk 
+
+```{r}
+
+result27_all <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=Tau,
+                            universe=union_bulk_tau,
+                            nadj=1,
+                            trunc=FALSE, 
+                            plot=TRUE,
+                            save_res = "./results/result27_all.csv",
+                            width_fig = 7,
+                            height_fig = 4,
+                            plotmax = 0.5,
+                            save_fig = "./results/result27_all.svg",
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            tidy_col = c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down","Tau Fibril vs. UT - Up", "hTau - Down", "hTau - Up"), 
+                            tidy_row = c("Collapsed Brain - Up", "Collapsed Brain - Down", "Cortical - Up", "Cortical - Down", "Subcortical - Up", "Subcortical - Down"))
+
+result27 <- Overlap_HLC_func(list1 = bulk_all,
+                            list2=Tau,
+                            universe=union_bulk_tau,
+                            nadj=1,
+                            trunc=TRUE, 
+                            plot=TRUE,
+                            plotmax = 0.5,
+                            trunc_col = c("Tau Monomer vs. UT - Down", "Tau Fibril vs. UT - Down", "hTau - Down"),
+                            trunc_row = c("Collapsed_down","Cortical_down", "Subcortical_down"), 
+                            tidy_col = c("Tau Fibril vs. UT", "hTau"), 
+                            tidy_row = c(" Collapsed Brain", "Cortical", "Subcortical"), 
+                            list1_title = "Bulk RNAseq PD vs. Control",
+                            save_res = "./results/result27.csv",
+                            save_fig = "./results/result27.svg",
+                            width_fig = 7,
+                            height_fig = 4)
+
+```
+
